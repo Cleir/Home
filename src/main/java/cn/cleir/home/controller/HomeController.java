@@ -2,8 +2,14 @@ package cn.cleir.home.controller;
 
 
 import cn.cleir.home.domain.Bus;
-import cn.cleir.home.repository.HomeRepository;
+import cn.cleir.home.domain.Car;
+import cn.cleir.home.domain.Express;
+import cn.cleir.home.repository.BusRepository;
+import cn.cleir.home.repository.CarRespository;
+import cn.cleir.home.repository.ExpressRepository;
 import cn.cleir.home.until.HttpUtils;
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONObject;
 import org.apache.http.HttpResponse;
 import org.apache.http.util.EntityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,7 +25,11 @@ import java.util.Map;
 public class HomeController {
 
     @Autowired
-    private HomeRepository homeRepository;
+    private BusRepository busRepository;
+    @Autowired
+    private CarRespository carRespository;
+    @Autowired
+    private ExpressRepository expressRepository;
 
     private String appcode = "08660ae3c8004e7cb59db8cefb437b7d";
 
@@ -32,7 +42,6 @@ public class HomeController {
         String path = "/transit/nearby";
         String method = "GET";
         Map<String, String> headers = new HashMap<String, String>();
-        //最后在header中的格式(中间是英文空格)为Authorization:APPCODE 83359fd73fe94948385f570e3c139105
         headers.put("Authorization", "APPCODE " + appcode);
         Map<String, String> querys = new HashMap<String, String>();
         querys.put("address", address);
@@ -49,14 +58,88 @@ public class HomeController {
             //获取response的body
             String result = EntityUtils.toString(response.getEntity());
             bus.setResult(result);
-
-            //System.out.println(result);
-            return homeRepository.save(bus);
+            System.out.println(result);
+            return busRepository.save(bus);
         } catch (Exception e) {
             e.printStackTrace();
-            return homeRepository.save(bus);
+            return busRepository.save(bus);
         }
 
     }
+
+    /**
+     * 驾驶分查询
+     */
+    @PostMapping("/car")
+    public Car GetCarScore(@Valid String driveNum, @Valid String fileNum){
+        String host = "https://jisujszkf.market.alicloudapi.com";
+        String path = "/driverlicense/query";
+        String method = "GET";
+        Map<String, String> headers = new HashMap<String, String>();
+        headers.put("Authorization", "APPCODE " + appcode);
+        Map<String, String> querys = new HashMap<String, String>();
+        querys.put("licenseid", fileNum);
+        querys.put("licensenumber", driveNum);
+
+        Car car = new Car();
+        car.setDriveNum(driveNum);
+        car.setFileNum(fileNum);
+
+        try {
+            HttpResponse response = HttpUtils.doGet(host, path, method, headers, querys);
+            System.out.println(response.toString());
+            String result = EntityUtils.toString(response.getEntity());
+            car.setResult(result);
+            System.out.println(result);
+            //解析返回结果
+            JSONObject carJson = JSON.parseObject(result);
+            //解析返回结果中的result
+            JSONObject resultJson = JSONObject.parseObject(carJson.getString("result"));
+            try{
+                //获取扣分
+                car.setScore(resultJson.getInteger("score"));
+            } catch (NullPointerException e){
+                System.out.println("无返回结果");
+            }
+            return carRespository.save(car);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return carRespository.save(car);
+        }
+    }
+
+    /**
+     * 快递查询
+     */
+    @PostMapping("/exp")
+    public Express getExp(@Valid String no, @Valid String type){
+        String host = "https://cexpress.market.alicloudapi.com";
+        String path = "/cexpress";
+        String method = "GET";
+        Map<String, String> headers = new HashMap<String, String>();
+        headers.put("Authorization", "APPCODE " + appcode);
+        Map<String, String> querys = new HashMap<String, String>();
+        querys.put("no", no);
+        querys.put("type", type);
+
+        Express exp = new Express();
+        exp.setNo(no);
+        exp.setType(type);
+
+        try {
+            HttpResponse response = HttpUtils.doGet(host, path, method, headers, querys);
+            String result = EntityUtils.toString(response.getEntity());
+            System.out.println(result);
+            JSONObject expJson = JSONObject.parseObject(result);
+            exp.setList(expJson.getString("list"));
+            exp.setName(expJson.getString("name"));
+            return expressRepository.save(exp);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+
+    }
+
 
 }

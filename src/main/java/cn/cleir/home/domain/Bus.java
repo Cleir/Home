@@ -62,4 +62,8 @@ public class Bus {
     public void setCity(String city) {
         this.city = city;
     }
+
+    public void say(){
+        System.out.println("Bus say:" + this.hashCode());
+    }
 }
